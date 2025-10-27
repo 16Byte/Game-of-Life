@@ -1,13 +1,16 @@
 #include "raylib.h"
 #include <vector>
+#include <deque>
 #include <cstdlib>
 #include <ctime>
+#include <cstdio>
 
 const int GRID_WIDTH = 80;
 const int GRID_HEIGHT = 60;
 const int CELL_SIZE = 10;
 const int SCREEN_WIDTH = GRID_WIDTH * CELL_SIZE;
 const int SCREEN_HEIGHT = GRID_HEIGHT * CELL_SIZE;
+const int MAX_HISTORY = 100; // Maximum number of states to keep in history
 
 enum GameState {
     MAIN_MENU,
@@ -92,6 +95,9 @@ int main() {
     std::vector<std::vector<bool>> grid(GRID_HEIGHT, std::vector<bool>(GRID_WIDTH, false));
     std::vector<std::vector<bool>> nextGrid(GRID_HEIGHT, std::vector<bool>(GRID_WIDTH, false));
     
+    // History for back stepping
+    std::deque<std::vector<std::vector<bool>>> history;
+    
     GameState currentState = MAIN_MENU;
     bool paused = true;
     int frameCounter = 0;
@@ -128,22 +134,42 @@ int main() {
             
             // Step forward one frame when paused
             if (paused && IsKeyPressed(KEY_RIGHT)) {
+                // Save current state to history before stepping forward
+                history.push_back(grid);
+                if (history.size() > MAX_HISTORY) {
+                    history.pop_front();
+                }
                 updateGrid(grid, nextGrid);
+            }
+            
+            // Step backward one frame when paused
+            if (paused && IsKeyPressed(KEY_LEFT)) {
+                if (!history.empty()) {
+                    grid = history.back();
+                    history.pop_back();
+                }
             }
             
             if (IsKeyPressed(KEY_C)) {
                 clearGrid(grid);
+                history.clear(); // Clear history when grid is cleared
             }
             
             if (IsKeyPressed(KEY_ESCAPE)) {
                 currentState = MAIN_MENU;
                 paused = true;
                 clearGrid(grid);
+                history.clear(); // Clear history when returning to menu
             }
             
             if (!paused) {
                 frameCounter++;
                 if (frameCounter >= 6) {
+                    // Save current state to history before updating
+                    history.push_back(grid);
+                    if (history.size() > MAX_HISTORY) {
+                        history.pop_front();
+                    }
                     updateGrid(grid, nextGrid);
                     frameCounter = 0;
                 }
@@ -188,6 +214,7 @@ int main() {
             
             if (drawButton("BLANK", buttonX, 220, buttonWidth, buttonHeight, blankHovered)) {
                 clearGrid(grid);
+                history.clear();
                 currentState = SIMULATION;
                 paused = false;
             }
@@ -195,6 +222,7 @@ int main() {
             if (drawButton("RANDOM SEED", buttonX, 300, buttonWidth, buttonHeight, randomHovered)) {
                 clearGrid(grid);
                 randomSeed(grid);
+                history.clear();
                 currentState = SIMULATION;
                 paused = false;
             }
@@ -213,8 +241,16 @@ int main() {
                 }
             }
             
-            const char* status = paused ? "PAUSED (SPACE to start | RIGHT ARROW to step)" : "RUNNING (SPACE to pause)";
+            const char* status = paused ? "PAUSED (SPACE: play | LEFT/RIGHT: step back/forward)" : "RUNNING (SPACE to pause)";
             DrawText(status, 10, 10, 20, GREEN);
+            
+            // Show history count when paused
+            if (paused) {
+                char historyText[32];
+                snprintf(historyText, sizeof(historyText), "History: %zu states", history.size());
+                DrawText(historyText, 10, 35, 16, LIGHTGRAY);
+            }
+            
             DrawText("Left Click: Draw | Right Click: Erase | C: Clear | ESC: Menu", 10, SCREEN_HEIGHT - 30, 20, GRAY);
         }
         
