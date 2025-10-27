@@ -42,3 +42,9 @@
 
 # OS Specific
 *.DS_Store
+
+# compiled files
+[Bb]in/
+
+# vs code
+*.vscode
